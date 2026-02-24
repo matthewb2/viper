@@ -21,6 +21,27 @@ class MersoomMonitor:
         # [추가] 초기 로딩 로직 실행
         self._load_previous_comments()
         
+    def _fetch_blog_content(self, url):
+        """블로그 주소에 방문하여 텍스트 내용을 가져옴"""
+        try:
+            print(f"[시스템] 블로그 방문 중: {url}")
+            res = requests.get(url, timeout=10, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            })
+            if res.status_code == 200:
+                # HTML 태그를 제거하는 간단한 정규식 (더 정밀한 파싱은 BeautifulSoup 추천)
+                clean_text = re.sub(r'<[^>]+>', '', res.text)
+                return clean_text[:1500].strip()  # AI 토큰 절약을 위해 상위 1500자만 추출
+        except Exception as e:
+            print(f"[!] 블로그 방문 에러: {e}")
+        return None
+        
+    def _extract_url(self, text):
+        """텍스트 내에서 http/https 블로그 주소를 추출"""
+        url_pattern = r'(https?://[^\s<>"]+|www\.[^\s<>"]+)'
+        urls = re.findall(url_pattern, text)
+        return urls[0] if urls else None
+        
     def _load_previous_comments(self):
         """프로그램 시작 시 최근 20개 게시물을 확인하여 내 댓글 ID를 수집함"""
         print("[시스템] 과거 댓글 데이터 로딩 중...")
@@ -107,6 +128,9 @@ class MersoomMonitor:
             latest_post = posts[0]
             current_post_id = latest_post.get("id") or latest_post.get("_id")
 
+            # [수정] 변수 정의를 확실히 합니다.
+            author_nickname = latest_post.get("nickname", "")
+            
             # 2. 새로운 글인지 확인
             if self.last_checked_post_id != current_post_id:
                 print(f"\n[🔔 알림] 새로운 글 발견: {latest_post.get('title')}")
@@ -120,7 +144,14 @@ class MersoomMonitor:
                 # 3. AI에게 상황을 전달하여 댓글 생성 유도
                 # (이 부분은 메인 루프의 AI와 연동되거나, 특정 페르소나를 사용하여 생성합니다)
                 # 여기서는 '자동 댓글' 명령어를 action_manager에 직접 주입합니다.
-                
+                # [핵심 추가] 블로그 주소 감지 및 방문
+                blog_url = self._extract_url(content)
+                blog_context = ""
+                if blog_url:
+                    blog_text = self._fetch_blog_content(blog_url)
+                    if blog_text:
+                        blog_context = f"\n\n--- 블로그 외부 링크 내용 ---\n{blog_text}\n---------------------------"
+                        print(f"[완료] 블로그 내용을 성공적으로 읽어왔습니다.")
                 # 예시: AI가 작성할 법한 프롬프트를 시뮬레이션
                 context = f"새로운 글이 올라왔음.\n제목: {latest_post.get('title')}\n내용: {latest_post.get('content', '')}"
                 
