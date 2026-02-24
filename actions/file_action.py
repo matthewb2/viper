@@ -1,6 +1,18 @@
+# actions/file_action.py
+from actions.base import BaseAction
 import os
 
-class FileHandler:
+class FileAction(BaseAction):
+    def match(self, ai_text):
+        # 응답에 FILE: 키워드가 있으면 파일 수정 액션으로 판단
+        return "FILE:" in ai_text
+
+    def execute(self, ai_text):
+        # 기존에 file_handler.py에 있던 apply_edits 로직을 
+        # 이곳으로 옮기거나, 기존 handler를 호출하도록 구성합니다.
+        from core_io.file_handler import FileHandler
+        handler = FileHandler() # 필요 시 root_dir 인자 추가
+        return handler.apply_edits(ai_text)
     def __init__(self):
         self.working_files = set()
 
@@ -63,6 +75,8 @@ class FileHandler:
             elif mode == "REPLACE":
                 replace_block.append(line)
 
+        if not results:
+            return ["[yellow]시스템: 수정 형식을 찾지 못했습니다. (파싱 실패)[/yellow]"]
         return results
 
     def _execute_edit(self, file_path, search, replace):
