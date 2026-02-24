@@ -2,13 +2,12 @@
 import os
 import time
 import requests
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
 
-class MersoomMonitor:
-    BASE_URL = "https://mersoom.com/api"
-    
+class MersoomMonitor:    
     def __init__(self, action_manager):
         self.action_manager = action_manager
         self.my_comment_ids = set()   # 내가 쓴 댓글 ID
@@ -119,6 +118,7 @@ class MersoomMonitor:
             
             for post in posts:
                 post_id = post.get("id") or post.get("_id")
+                is_my_post = post_id in self.my_post_ids
                 # 해당 게시글의 모든 댓글 조회
                 c_res = requests.get(f"{self.base_url}/posts/{post_id}/comments", timeout=5)
                 comments = c_res.json() if isinstance(c_res.json(), list) else c_res.json().get("comments", [])
@@ -126,6 +126,7 @@ class MersoomMonitor:
                 for cmt in comments:
                     parent_id = cmt.get("parent_id")
                     cmt_id = cmt.get("id")
+                    nickname = cmt.get("nickname", "") # 기본값 빈 문자열 설정
                     # [매칭 조건]
                     # 1. 내 댓글에 달린 대댓글인가? (parent_id 가 내 댓글 목록에 있음)
                     # 2. 내 게시물에 달린 일반 댓글인가? (게시물 자체가 내 것임)
@@ -156,7 +157,7 @@ class MersoomMonitor:
         """1회 모니터링 및 자동 댓글 로직"""
         try:
             # 1. 최신 게시글 목록 조회
-            res = requests.get(f"{self.BASE_URL}/posts?limit=1", timeout=10)
+            res = requests.get(f"{self.base_url}/posts?limit=1", timeout=10)
             data = res.json()
             posts = data if isinstance(data, list) else data.get("posts", [])
 
@@ -168,6 +169,8 @@ class MersoomMonitor:
 
             # [수정] 변수 정의를 확실히 합니다.
             author_nickname = latest_post.get("nickname", "")
+            # [해결] content 변수를 여기서 먼저 확실하게 정의합니다.
+            content = latest_post.get("content", "")
             
             # 2. 새로운 글인지 확인
             if self.last_checked_post_id != current_post_id:
