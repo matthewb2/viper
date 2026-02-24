@@ -11,10 +11,11 @@ class MersoomMonitor:
     
     def __init__(self, action_manager):
         self.action_manager = action_manager
+        self.my_comment_ids = set()   # 내가 쓴 댓글 ID
+        self.my_post_ids = set()      # 내가 쓴 게시물 ID [추가]
+        self.responded_ids = set()    # 이미 답장한 댓글/대댓글 ID
         self.last_checked_post_id = None
         self.base_url = "https://www.mersoom.com/api"
-        self.my_comment_ids = set() # 내가 쓴 댓글 ID 저장
-        self.responded_ids = set()  # 이미 답장한 대댓글 ID 저장
         self.auth_id = os.getenv("MERSOOM_AUTH_ID")
         self.password = os.getenv("MERSOOM_PASSWORD")
         
@@ -72,12 +73,43 @@ class MersoomMonitor:
         except Exception as e:
             print(f"[!] 초기 로딩 중 오류 발생: {e}")
 
+    def _load_previous_data(self):
+        """과거 데이터 로딩: 내 글과 내 댓글 ID 수집"""
+        print("[시스템] 과거 데이터(글/댓글) 로딩 중...")
+        try:
+            res = requests.get(f"{self.base_url}/posts?limit=30", timeout=10)
+            posts = res.json() if isinstance(res.json(), list) else res.json().get("posts", [])
+            
+            for post in posts:
+                post_id = str(post.get("id") or post.get("_id"))
+                
+                # 1. 내가 쓴 게시물 저장
+                if post.get("nickname") == "바이퍼":
+                    self.my_post_ids.add(post_id)
+                
+                # 2. 내 게시물 혹은 타인 게시물의 댓글 전수 조사
+                c_res = requests.get(f"{self.base_url}/posts/{post_id}/comments", timeout=5)
+                comments = c_res.json() if isinstance(c_res.json(), list) else c_res.json().get("comments", [])
+                
+                for cmt in comments:
+                    if cmt.get("nickname") == "바이퍼":
+                        self.my_comment_ids.add(str(cmt.get("id") or cmt.get("_id")))
+            
+            print(f"[시스템] 로딩 완료: 내 글 {len(self.my_post_ids)}개, 내 댓글 {len(self.my_comment_ids)}개 추적 중")
+        except Exception as e:
+            print(f"[!] 초기 로딩 에러: {e}")
+            
     def add_my_comment(self, comment_id):
         """내 댓글 ID를 추적 목록에 추가 (CommentAction에서 호출)"""
         self.my_comment_ids.add(comment_id)
 
+    def add_my_post(self, post_id):
+        """새로 작성한 게시물 ID 추가 (MersoomAction 등에서 호출 가능)"""
+        if post_id:
+            self.my_post_ids.add(str(post_id))
+            
     def check_for_replies(self):
-        """내 댓글에 달린 새로운 답글이 있는지 확인"""
+        """1. 내 댓글에 달린 답글 탐색 + 2. 내 게시물에 달린 새 댓글 탐색"""
         replies_found = []
         
         # 최근 게시글들을 순회하며 댓글 목록 확인
@@ -94,20 +126,26 @@ class MersoomMonitor:
                 for cmt in comments:
                     parent_id = cmt.get("parent_id")
                     cmt_id = cmt.get("id")
-                    
-                    # 1. 내 댓글에 달린 답글인가? 
-                    # 2. 내가 쓴 게 아닌가? (무한 루프 방지)
-                    # 3. 이미 답장한 적이 없는가?
-                    if parent_id in self.my_comment_ids and \
-                       cmt_id not in self.my_comment_ids and \
-                       cmt_id not in self.responded_ids:
-                        
+                    # [매칭 조건]
+                    # 1. 내 댓글에 달린 대댓글인가? (parent_id 가 내 댓글 목록에 있음)
+                    # 2. 내 게시물에 달린 일반 댓글인가? (게시물 자체가 내 것임)
+                    should_respond = False
+                    if parent_id and parent_id in self.my_comment_ids:
+                        should_respond = True
+                        reason = "내 댓글에 대한 답글"
+                    elif is_my_post and not parent_id: # 내 글에 달린 '첫 번째 뎁스' 댓글
+                        should_respond = True
+                        reason = "내 게시물의 새 댓글"
+
+                    if should_respond:
+                        print(f"[🎯 감지] {reason} 발견! ({nickname}: {cmt.get('content')[:20]}...)")
                         self.responded_ids.add(cmt_id)
                         replies_found.append({
                             "post_id": post_id,
-                            "parent_id": cmt_id, # 이제 이 대댓글이 나의 대답의 부모가 됨
+                            "parent_id": cmt_id, 
                             "content": cmt.get("content"),
-                            "nickname": cmt.get("nickname")
+                            "nickname": nickname,
+                            "context_type": "post_owner" if is_my_post else "comment_author"
                         })
         except Exception as e:
             print(f"답글 확인 중 오류: {e}")
