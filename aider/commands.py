@@ -1117,7 +1117,7 @@ class Commands:
         self.io.tool_output("Use `/help <question>` to ask questions about how to use aider.")
 
     def cmd_help(self, args):
-        "Ask questions about aider"
+        "Ask questions about Viper"
 
         if not args.strip():
             self.basic_help()
