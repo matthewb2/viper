@@ -13,16 +13,16 @@ from PIL import Image, ImageGrab
 from prompt_toolkit.completion import Completion, PathCompleter
 from prompt_toolkit.document import Document
 
-from aider import models, prompts, voice
-from aider.editor import pipe_editor
-from aider.format_settings import format_settings
-from aider.help import Help, install_help_extra
-from aider.io import CommandCompletionException
-from aider.llm import litellm
-from aider.repo import ANY_GIT_ERROR
-from aider.run_cmd import run_cmd
-from aider.scrape import Scraper, install_playwright
-from aider.utils import is_image_file
+from viper import models, prompts, voice
+from viper.editor import pipe_editor
+from viper.format_settings import format_settings
+from viper.help import Help, install_help_extra
+from viper.io import CommandCompletionException
+from viper.llm import litellm
+from viper.repo import ANY_GIT_ERROR
+from viper.run_cmd import run_cmd
+from viper.scrape import Scraper, install_playwright
+from viper.utils import is_image_file
 
 from .dump import dump  # noqa: F401
 
