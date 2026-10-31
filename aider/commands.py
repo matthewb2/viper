@@ -155,7 +155,7 @@ class Commands:
         show_formats = OrderedDict(
             [
                 ("help", "Get help about using aider (usage, config, troubleshoot)."),
-                ("ask", "Ask questions about your code without making any changes."),
+                ("ask", "Ask questions about Aider without making any changes."),
                 ("code", "Ask for changes to your code (using the best edit format)."),
                 (
                     "architect",
