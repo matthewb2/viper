@@ -28,26 +28,26 @@ from typing import List
 
 from rich.console import Console
 
-from aider import __version__, models, prompts, urls, utils
-from aider.analytics import Analytics
-from aider.commands import Commands
-from aider.exceptions import LiteLLMExceptions
-from aider.history import ChatSummary
-from aider.io import ConfirmGroup, InputOutput
-from aider.linter import Linter
-from aider.llm import litellm
-from aider.models import RETRY_TIMEOUT
-from aider.reasoning_tags import (
+from viper import __version__, models, prompts, urls, utils
+from viper.analytics import Analytics
+from viper.commands import Commands
+from viper.exceptions import LiteLLMExceptions
+from viper.history import ChatSummary
+from viper.io import ConfirmGroup, InputOutput
+from viper.linter import Linter
+from viper.llm import litellm
+from viper.models import RETRY_TIMEOUT
+from viper.reasoning_tags import (
     REASONING_TAG,
     format_reasoning_content,
     remove_reasoning_content,
     replace_reasoning_tags,
 )
-from aider.repo import ANY_GIT_ERROR, GitRepo
-from aider.repomap import RepoMap
-from aider.run_cmd import run_cmd
-from aider.utils import format_content, format_messages, format_tokens, is_image_file
-from aider.waiting import WaitingSpinner
+from viper.repo import ANY_GIT_ERROR, GitRepo
+from viper.repomap import RepoMap
+from viper.run_cmd import run_cmd
+from viper.utils import format_content, format_messages, format_tokens, is_image_file
+from viper.waiting import WaitingSpinner
 
 from ..dump import dump  # noqa: F401
 from .chat_chunks import ChatChunks
@@ -131,7 +131,7 @@ class Coder:
         summarize_from_coder=True,
         **kwargs,
     ):
-        import aider.coders as coders
+        import viper.coders as coders
 
         if not main_model:
             if from_coder:
@@ -2406,7 +2406,7 @@ class Coder:
         if not self.commit_before_message:
             return
         if self.commit_before_message[-1] != self.repo.get_head_commit_sha():
-            self.io.tool_output("You can use /undo to undo and discard each aider commit.")
+            self.io.tool_output("You can use /undo to undo and discard each viper commit.")
 
     def dirty_commit(self):
         if not self.need_commit_before_edits:
