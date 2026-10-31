@@ -5,8 +5,8 @@ import sys
 
 import pypandoc
 
-from aider import __version__, urls, utils
-from aider.dump import dump  # noqa: F401
+from viper import __version__, urls, utils
+from viper.dump import dump  # noqa: F401
 
 aider_user_agent = f"Aider/{__version__} +{urls.website}"
 

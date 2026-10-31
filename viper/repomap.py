@@ -18,9 +18,9 @@ from pygments.token import Token
 from tqdm import tqdm
 from tree_sitter import Query
 
-from aider.dump import dump
-from aider.special import filter_important_files
-from aider.waiting import Spinner
+from viper.dump import dump
+from viper.special import filter_important_files
+from viper.waiting import Spinner
 
 # tree_sitter is throwing a FutureWarning
 warnings.simplefilter("ignore", category=FutureWarning)

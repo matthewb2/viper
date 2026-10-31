@@ -11,8 +11,8 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 
-from aider import urls
-from aider.io import InputOutput
+from viper import urls
+from viper.io import InputOutput
 
 
 def check_openrouter_tier(api_key):

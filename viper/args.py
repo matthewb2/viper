@@ -8,13 +8,13 @@ from pathlib import Path
 import configargparse
 import shtab
 
-from aider import __version__
-from aider.args_formatter import (
+from viper import __version__
+from viper.args_formatter import (
     DotEnvFormatter,
     MarkdownHelpFormatter,
     YamlHelpFormatter,
 )
-from aider.deprecated import add_deprecated_model_args
+from viper.deprecated import add_deprecated_model_args
 
 from .dump import dump  # noqa: F401
 
@@ -43,7 +43,7 @@ def get_parser(default_config_files, git_root):
     # List of valid edit formats for argparse validation & shtab completion.
     # Dynamically gather them from the registered coder classes so the list
     # stays in sync if new formats are added.
-    from aider import coders as _aider_coders
+    from viper import coders as _aider_coders
 
     edit_format_choices = sorted(
         {

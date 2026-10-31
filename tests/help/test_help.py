@@ -4,12 +4,12 @@ from unittest.mock import MagicMock
 
 from requests.exceptions import ConnectionError, ReadTimeout
 
-import aider
-from aider.coders import Coder
-from aider.commands import Commands
-from aider.help import Help, fname_to_url
-from aider.io import InputOutput
-from aider.models import Model
+import viper
+from viper.coders import Coder
+from viper.commands import Commands
+from viper.help import Help, fname_to_url
+from viper.io import InputOutput
+from viper.models import Model
 
 
 class TestHelp(unittest.TestCase):
@@ -57,12 +57,12 @@ class TestHelp(unittest.TestCase):
         commands = Commands(io, coder)
 
         help_coder_run = MagicMock(return_value="")
-        aider.coders.HelpCoder.run = help_coder_run
+        viper.coders.HelpCoder.run = help_coder_run
 
         def run_help_command():
             try:
                 commands.cmd_help("hi")
-            except aider.commands.SwitchCoder:
+            except viper.commands.SwitchCoder:
                 pass
             else:
                 # If no exception was raised, fail the test

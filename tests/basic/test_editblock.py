@@ -5,12 +5,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from aider.coders import Coder
-from aider.coders import editblock_coder as eb
-from aider.dump import dump  # noqa: F401
-from aider.io import InputOutput
-from aider.models import Model
-from aider.utils import ChdirTemporaryDirectory
+from viper.coders import Coder
+from viper.coders import editblock_coder as eb
+from viper.dump import dump  # noqa: F401
+from viper.io import InputOutput
+from viper.models import Model
+from viper.utils import ChdirTemporaryDirectory
 
 
 class TestUtils(unittest.TestCase):

@@ -16,12 +16,12 @@ import json5
 import yaml
 from PIL import Image
 
-from aider import __version__
-from aider.dump import dump  # noqa: F401
-from aider.llm import litellm
-from aider.openrouter import OpenRouterModelManager
-from aider.sendchat import ensure_alternating_roles, sanity_check_messages
-from aider.utils import check_pip_install_extra
+from viper import __version__
+from viper.dump import dump  # noqa: F401
+from viper.llm import litellm
+from viper.openrouter import OpenRouterModelManager
+from viper.sendchat import ensure_alternating_roles, sanity_check_messages
+from viper.utils import check_pip_install_extra
 
 RETRY_TIMEOUT = 60
 
@@ -152,7 +152,7 @@ class ModelSettings:
 
 # Load model settings from package resource
 MODEL_SETTINGS = []
-with importlib.resources.open_text("aider.resources", "model-settings.yml") as f:
+with importlib.resources.open_text("viper.resources", "model-settings.yml") as f:
     model_settings_list = yaml.safe_load(f)
     for model_settings_dict in model_settings_list:
         MODEL_SETTINGS.append(ModelSettings(**model_settings_dict))
@@ -1037,7 +1037,7 @@ class Model(ModelSettings):
         return hash_object, res
 
     def simple_send_with_retries(self, messages):
-        from aider.exceptions import LiteLLMExceptions
+        from viper.exceptions import LiteLLMExceptions
 
         litellm_ex = LiteLLMExceptions()
         if "deepseek-reasoner" in self.name:
@@ -1059,7 +1059,7 @@ class Model(ModelSettings):
                 if not response or not hasattr(response, "choices") or not response.choices:
                     return None
                 res = response.choices[0].message.content
-                from aider.reasoning_tags import remove_reasoning_content
+                from viper.reasoning_tags import remove_reasoning_content
 
                 return remove_reasoning_content(res, self.reasoning_tag)
 

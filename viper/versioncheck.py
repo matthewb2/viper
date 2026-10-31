@@ -5,9 +5,9 @@ from pathlib import Path
 
 import packaging.version
 
-import aider
-from aider import utils
-from aider.dump import dump  # noqa: F401
+import viper
+from viper import utils
+from viper.dump import dump  # noqa: F401
 
 VERSION_CHECK_FNAME = Path.home() / ".aider" / "caches" / "versioncheck"
 
@@ -78,7 +78,7 @@ def check_version(io, just_check=False, verbose=False):
         response = requests.get("https://pypi.org/pypi/aider-chat/json")
         data = response.json()
         latest_version = data["info"]["version"]
-        current_version = aider.__version__
+        current_version = viper.__version__
 
         if just_check or verbose:
             io.tool_output(f"Current version: {current_version}")

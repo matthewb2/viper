@@ -1,7 +1,7 @@
 import argparse
 
-from aider import models, prompts
-from aider.dump import dump  # noqa: F401
+from viper import models, prompts
+from viper.dump import dump  # noqa: F401
 
 
 class ChatSummary:

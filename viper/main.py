@@ -18,24 +18,24 @@ import shtab
 from dotenv import load_dotenv
 from prompt_toolkit.enums import EditingMode
 
-from aider import __version__, models, urls, utils
-from aider.analytics import Analytics
-from aider.args import get_parser
-from aider.coders import Coder
-from aider.coders.base_coder import UnknownEditFormat
-from aider.commands import Commands, SwitchCoder
-from aider.copypaste import ClipboardWatcher
-from aider.deprecated import handle_deprecated_model_args
-from aider.format_settings import format_settings, scrub_sensitive_info
-from aider.history import ChatSummary
-from aider.io import InputOutput
-from aider.llm import litellm  # noqa: F401; properly init litellm on launch
-from aider.models import ModelSettings
-from aider.onboarding import offer_openrouter_oauth, select_default_model
-from aider.repo import ANY_GIT_ERROR, GitRepo
-from aider.report import report_uncaught_exceptions
-from aider.versioncheck import check_version, install_from_main_branch, install_upgrade
-from aider.watch import FileWatcher
+from viper import __version__, models, urls, utils
+from viper.analytics import Analytics
+from viper.args import get_parser
+from viper.coders import Coder
+from viper.coders.base_coder import UnknownEditFormat
+from viper.commands import Commands, SwitchCoder
+from viper.copypaste import ClipboardWatcher
+from viper.deprecated import handle_deprecated_model_args
+from viper.format_settings import format_settings, scrub_sensitive_info
+from viper.history import ChatSummary
+from viper.io import InputOutput
+from viper.llm import litellm  # noqa: F401; properly init litellm on launch
+from viper.models import ModelSettings
+from viper.onboarding import offer_openrouter_oauth, select_default_model
+from viper.repo import ANY_GIT_ERROR, GitRepo
+from viper.report import report_uncaught_exceptions
+from viper.versioncheck import check_version, install_from_main_branch, install_upgrade
+from viper.watch import FileWatcher
 
 from .dump import dump  # noqa: F401
 
@@ -233,7 +233,7 @@ def write_streamlit_credentials():
 def launch_gui(args):
     from streamlit.web import cli
 
-    from aider import gui
+    from viper import gui
 
     print()
     print("CONTROL-C to exit...")
@@ -334,7 +334,7 @@ def generate_search_path_list(default_file, git_root, command_line_file):
 
 def register_models(git_root, model_settings_fname, io, verbose=False):
     model_settings_files = generate_search_path_list(
-        ".aider.model.settings.yml", git_root, model_settings_fname
+        ".viper.model.settings.yml", git_root, model_settings_fname
     )
 
     try:
@@ -391,11 +391,11 @@ def register_litellm_models(git_root, model_metadata_fname, io, verbose=False):
     model_metadata_files = []
 
     # Add the resource file path
-    resource_metadata = importlib_resources.files("aider.resources").joinpath("model-metadata.json")
+    resource_metadata = importlib_resources.files("viper.resources").joinpath("model-metadata.json")
     model_metadata_files.append(str(resource_metadata))
 
     model_metadata_files += generate_search_path_list(
-        ".aider.model.metadata.json", git_root, model_metadata_fname
+        ".viper.model.metadata.json", git_root, model_metadata_fname
     )
 
     try:
@@ -461,7 +461,7 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
     else:
         git_root = get_git_root()
 
-    conf_fname = Path(".aider.conf.yml")
+    conf_fname = Path(".viper.conf.yml")
 
     default_config_files = []
     try:
@@ -1086,7 +1086,7 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
             return
         coder.partial_response_content = content
         # For testing #2879
-        # from aider.coders.base_coder import all_fences
+        # from viper.coders.base_coder import all_fences
         # coder.fence = all_fences[1]
         coder.apply_updates()
         analytics.event("exit", reason="Applied updates")

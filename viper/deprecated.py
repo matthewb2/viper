@@ -105,7 +105,7 @@ def handle_deprecated_model_args(args, io):
         arg_name_clean = arg_name.replace("-", "_")
         if hasattr(args, arg_name_clean) and getattr(args, arg_name_clean):
             # Find preferred name to display in warning
-            from aider.models import MODEL_ALIASES
+            from viper.models import MODEL_ALIASES
 
             display_name = model_name
             # Check if there's a shorter alias for this model

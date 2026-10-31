@@ -138,7 +138,7 @@ class Commands:
     def cmd_chat_mode(self, args):
         "Switch to a new chat mode"
 
-        from aider import coders
+        from viper import coders
 
         ef = args.strip()
         valid_formats = OrderedDict(
@@ -1124,7 +1124,7 @@ class Commands:
             return
 
         self.coder.event("interactive help")
-        from aider.coders.base_coder import Coder
+        from viper.coders.base_coder import Coder
 
         if not self.help:
             res = install_help_extra(self.io)
@@ -1208,7 +1208,7 @@ class Commands:
             # Switch to the corresponding chat mode if no args provided
             return self.cmd_chat_mode(edit_format)
 
-        from aider.coders.base_coder import Coder
+        from viper.coders.base_coder import Coder
 
         coder = Coder.create(
             io=self.io,
@@ -1554,7 +1554,7 @@ class Commands:
 
     def cmd_report(self, args):
         "Report a problem by opening a GitHub Issue"
-        from aider.report import report_github_issue
+        from viper.report import report_github_issue
 
         announcements = "\n".join(self.coder.get_announcements())
         issue_text = announcements

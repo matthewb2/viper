@@ -1,6 +1,6 @@
 import argparse
 
-from aider import urls
+from viper import urls
 
 from .dump import dump  # noqa: F401
 

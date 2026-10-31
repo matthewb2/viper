@@ -8,9 +8,9 @@ from pathlib import Path
 from mixpanel import MixpanelException
 from posthog import Posthog
 
-from aider import __version__
-from aider.dump import dump  # noqa: F401
-from aider.models import model_info_manager
+from viper import __version__
+from viper.dump import dump  # noqa: F401
+from viper.models import model_info_manager
 
 PERCENT = 10
 

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import oslex
 
-from aider.dump import dump  # noqa: F401
-from aider.waiting import Spinner
+from viper.dump import dump  # noqa: F401
+from viper.waiting import Spinner
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", ".pdf"}
 

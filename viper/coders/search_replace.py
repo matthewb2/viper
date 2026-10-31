@@ -11,8 +11,8 @@ except ImportError:
 from diff_match_patch import diff_match_patch
 from tqdm import tqdm
 
-from aider.dump import dump
-from aider.utils import GitTemporaryDirectory
+from viper.dump import dump
+from viper.utils import GitTemporaryDirectory
 
 
 class RelativeIndenter:

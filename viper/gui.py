@@ -6,12 +6,12 @@ import sys
 
 import streamlit as st
 
-from aider import urls
-from aider.coders import Coder
-from aider.dump import dump  # noqa: F401
-from aider.io import InputOutput
-from aider.main import main as cli_main
-from aider.scrape import Scraper, has_playwright
+from viper import urls
+from viper.coders import Coder
+from viper.dump import dump  # noqa: F401
+from viper.io import InputOutput
+from viper.main import main as cli_main
+from viper.scrape import Scraper, has_playwright
 
 
 class CaptureIO(InputOutput):

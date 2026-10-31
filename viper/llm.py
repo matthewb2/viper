@@ -2,7 +2,7 @@ import importlib
 import os
 import warnings
 
-from aider.dump import dump  # noqa: F401
+from viper.dump import dump  # noqa: F401
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 

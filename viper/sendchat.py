@@ -1,5 +1,5 @@
-from aider.dump import dump  # noqa: F401
-from aider.utils import format_messages
+from viper.dump import dump  # noqa: F401
+from viper.utils import format_messages
 
 
 def sanity_check_messages(messages):

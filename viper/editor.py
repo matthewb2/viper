@@ -15,7 +15,7 @@ import tempfile
 
 from rich.console import Console
 
-from aider.dump import dump  # noqa
+from viper.dump import dump  # noqa
 
 DEFAULT_EDITOR_NIX = "vi"
 DEFAULT_EDITOR_OS_X = "vim"

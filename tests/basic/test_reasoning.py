@@ -1,11 +1,11 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from aider.coders.base_coder import Coder
-from aider.dump import dump  # noqa
-from aider.io import InputOutput
-from aider.models import Model
-from aider.reasoning_tags import (
+from viper.coders.base_coder import Coder
+from viper.dump import dump  # noqa
+from viper.io import InputOutput
+from viper.models import Model
+from viper.reasoning_tags import (
     REASONING_END,
     REASONING_START,
     remove_reasoning_content,
@@ -579,7 +579,7 @@ End"""
             expected_content = "Final answer after reasoning"
             self.assertEqual(coder.partial_response_content.strip(), expected_content)
 
-    @patch("aider.models.litellm.completion")
+    @patch("viper.models.litellm.completion")
     def test_simple_send_with_retries_removes_reasoning(self, mock_completion):
         """Test that simple_send_with_retries correctly removes reasoning content."""
         model = Model("deepseek-r1")  # This model has reasoning_tag="think"

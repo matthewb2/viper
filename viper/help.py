@@ -8,9 +8,9 @@ from pathlib import Path
 
 import importlib_resources
 
-from aider import __version__, utils
-from aider.dump import dump  # noqa: F401
-from aider.help_pats import exclude_website_pats
+from viper import __version__, utils
+from viper.dump import dump  # noqa: F401
+from viper.help_pats import exclude_website_pats
 
 warnings.simplefilter("ignore", category=FutureWarning)
 
@@ -31,7 +31,7 @@ def install_help_extra(io):
 
 
 def get_package_files():
-    for path in importlib_resources.files("aider.website").iterdir():
+    for path in importlib_resources.files("viper.website").iterdir():
         if path.is_file():
             yield path
         elif path.is_dir():
@@ -112,7 +112,7 @@ def get_index():
                 continue
 
             doc = Document(
-                text=importlib_resources.files("aider.website")
+                text=importlib_resources.files("viper.website")
                 .joinpath(fname)
                 .read_text(encoding="utf-8"),
                 metadata=dict(

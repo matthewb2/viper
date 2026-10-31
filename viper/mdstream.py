@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
 
-from aider.dump import dump  # noqa: F401
+from viper.dump import dump  # noqa: F401
 
 _text_prefix = """
 # Header
@@ -229,7 +229,7 @@ class MarkdownStream:
 
 
 if __name__ == "__main__":
-    with open("aider/io.py", "r") as f:
+    with open("viper/io.py", "r") as f:
         code = f.read()
     _text = _text_prefix + code + _text_suffix
     _text = _text * 10

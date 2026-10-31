@@ -1,4 +1,4 @@
-from aider import diffs
+from viper import diffs
 
 from ..dump import dump  # noqa: F401
 from .base_coder import Coder

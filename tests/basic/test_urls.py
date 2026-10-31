@@ -1,6 +1,6 @@
 import requests
 
-from aider import urls
+from viper import urls
 
 
 def test_urls():

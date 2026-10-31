@@ -6,9 +6,9 @@ import traceback
 import urllib.parse
 import webbrowser
 
-from aider import __version__
-from aider.urls import github_issues
-from aider.versioncheck import VERSION_CHECK_FNAME
+from viper import __version__
+from viper.urls import github_issues
+from viper.versioncheck import VERSION_CHECK_FNAME
 
 FENCE = "`" * 3
 

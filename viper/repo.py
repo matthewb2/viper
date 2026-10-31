@@ -18,7 +18,7 @@ except ImportError:
 
 import pathspec
 
-from aider import prompts, utils
+from viper import prompts, utils
 
 from .dump import dump  # noqa: F401
 from .waiting import WaitingSpinner

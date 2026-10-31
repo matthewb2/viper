@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from aider.dump import dump  # noqa
-from aider.io import InputOutput
-from aider.watch import FileWatcher
+from viper.dump import dump  # noqa
+from viper.io import InputOutput
+from viper.watch import FileWatcher
 
 
 class MinimalCoder:
@@ -19,7 +19,7 @@ def test_gitignore_patterns():
     """Test that gitignore patterns are properly loaded and matched"""
     from pathlib import Path
 
-    from aider.watch import load_gitignores
+    from viper.watch import load_gitignores
 
     # Create a temporary gitignore file with test patterns
     tmp_gitignore = Path("test.gitignore")
