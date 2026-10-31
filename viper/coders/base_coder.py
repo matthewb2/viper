@@ -201,4 +201,5 @@ class Coder:
         raise UnknownEditFormat(edit_format, valid_formats)
 
     def clone(self, **kwargs):
-        new_coder = C
+        new_coder = Coder.create(from_coder=self, **kwargs)
+        return new_coder
