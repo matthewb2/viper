@@ -40,7 +40,9 @@ UPDATING_REPO_MAP_MESSAGE = "Updating repo map"
 
 
 class RepoMap:
-    TAGS_CACHE_DIR = f".aider.tags.cache.v{CACHE_VERSION}"
+    # Use a viper-specific cache directory so stale pickles created by the old
+    # "aider" package (which no longer exists) are never loaded.
+    TAGS_CACHE_DIR = f".viper.tags.cache.v{CACHE_VERSION}"
 
     warned_files = set()
 
@@ -224,6 +226,19 @@ class RepoMap:
     def save_tags_cache(self):
         pass
 
+    def invalidate_tags_cache_entry(self, cache_key, error):
+        """Drop a cache entry that cannot be unpickled and recompute it."""
+        if self.verbose:
+            self.io.tool_warning(f"Discarding invalid tags cache entry: {str(error)}")
+        try:
+            del self.TAGS_CACHE[cache_key]
+        except KeyError:
+            pass
+        except Exception as e:
+            # If the entry cannot be removed (e.g. the whole cache is broken),
+            # fall back to the in-memory cache.
+            self.tags_cache_error(e)
+
     def get_mtime(self, fname):
         try:
             return os.path.getmtime(fname)
@@ -242,6 +257,11 @@ class RepoMap:
         except SQLITE_ERRORS as e:
             self.tags_cache_error(e)
             val = self.TAGS_CACHE.get(cache_key)
+        except Exception as e:
+            # Stale cache entries may reference modules/classes that no longer
+            # exist (e.g. the old "aider" package). Treat them as a cache miss.
+            self.invalidate_tags_cache_entry(cache_key, e)
+            val = None
 
         if val is not None and val.get("mtime") == file_mtime:
             try:
@@ -249,6 +269,8 @@ class RepoMap:
             except SQLITE_ERRORS as e:
                 self.tags_cache_error(e)
                 return self.TAGS_CACHE[cache_key]["data"]
+            except Exception as e:
+                self.invalidate_tags_cache_entry(cache_key, e)
 
         # miss!
         data = list(self.get_tags_raw(fname, rel_fname))

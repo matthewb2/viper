@@ -3,6 +3,8 @@
 aider.code-workspace
 *.pyc
 .aider*
+.viper.tags.cache*
+aider.bak/
 aider_chat.egg-info/
 build
 dist/
