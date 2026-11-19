@@ -8,4 +8,5 @@ python -m venv .venv
 
 
 ## Run
-.venv/Scripts/python.exe -m viper --model <gemini/gemini-3.5-flash> --api-key <gemini>=<YOUR_API-KEY>
+.venv/Scripts/python.exe -m viper --model <gemini/gemini-3.5-flash> --api-key <gemini>=<YOUR_API-KEY> <프로젝트 폴더>
+
