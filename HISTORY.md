@@ -89,12 +89,12 @@
 ### Aider v0.84.0
 
 - Added support for new Claude models including the Sonnet 4 and Opus 4 series (e.g., `claude-sonnet-4-20250514`,
-`claude-opus-4-20250514`) across various providers. The default `sonnet` and `opus` aliases were updated to these newer
-versions.
+  `claude-opus-4-20250514`) across various providers. The default `sonnet` and `opus` aliases were updated to these newer
+  versions.
 - Added support for the `vertex_ai/gemini-2.5-flash-preview-05-20` model.
 - Fixed OpenRouter token cost calculation for improved accuracy.
 - Updated default OpenRouter models during onboarding to `deepseek/deepseek-r1:free` for the free tier and
-`anthropic/claude-sonnet-4` for paid tiers.
+  `anthropic/claude-sonnet-4` for paid tiers.
 - Automatically refresh GitHub Copilot tokens when used as OpenAI API keys, by Lih Chen.
 - Aider wrote 79% of the code in this release.
 
@@ -430,12 +430,15 @@ versions.
 - Case-insensitive model name matching while preserving original case.
 
 ### Aider v0.72.2
+
 - Harden against user/assistant turn order problems which cause R1 errors.
 
 ### Aider v0.72.1
+
 - Fix model metadata for `openrouter/deepseek/deepseek-r1`
 
 ### Aider v0.72.0
+
 - Support for DeepSeek R1.
   - Use shortcut: `--model r1`
   - Also via OpenRouter: `--model openrouter/deepseek/deepseek-r1`
@@ -500,7 +503,7 @@ versions.
 
 - [Watch files](https://aider.chat/docs/usage/watch.html) improvements:
   - Use `# ... AI?` comments to trigger aider and ask questions about your code.
-  - Now watches *all* files, not just certain source files.
+  - Now watches _all_ files, not just certain source files.
   - Use `# AI comments`, `// AI comments`, or `-- AI comments` to give aider instructions in any text file.
 - Full support for Gemini Flash 2.0 Exp:
   - `aider --model flash` or `aider --model gemini/gemini-2.0-flash-exp`
@@ -561,7 +564,7 @@ versions.
 - Removed spurious warning about disabling pretty in VSCode.
 - Removed broken support for Dart.
 - Bugfix when scraping URLs found in chat messages.
-- Better handling of __version__ import errors.
+- Better handling of **version** import errors.
 - Improved `/drop` command to support substring matching for non-glob patterns.
 - Aider wrote 82% of the code in this release.
 
@@ -604,7 +607,7 @@ versions.
 - Improved error handling and code formatting.
 - Aider wrote 74% of the code in this release.
 
-###  Aider v0.63.2
+### Aider v0.63.2
 
 - Fixed bug in fuzzy model name matching when litellm provider info is missing.
 - Modified model metadata file loading to allow override of resource file.
@@ -636,13 +639,13 @@ versions.
   - Almost as good as Sonnet at much lower cost.
   - Launch with `--haiku` to use it.
 - Easily apply file edits from ChatGPT, Claude or other web apps
-  - Chat with ChatGPT or Claude via their web app. 
+  - Chat with ChatGPT or Claude via their web app.
   - Give it your source files and ask for the changes you want.
   - Use the web app's "copy response" button to copy the entire reply from the LLM.
   - Run `aider --apply-clipboard-edits file-to-edit.js`.
   - Aider will edit your file with the LLM's changes.
 - Bugfix for creating new files.
-- Aider wrote 84% of the code in this release.  
+- Aider wrote 84% of the code in this release.
 
 ### Aider v0.61.0
 
@@ -698,7 +701,7 @@ versions.
   - Now uses `AIDER_YES_ALWAYS` env var and `yes-always:` YAML key.
   - Existing YAML and .env files will need to be updated.
   - Can still abbreviate to `--yes` on the command line.
-- Config file now uses standard YAML list syntax with `  - list entries`, one per line.  
+- Config file now uses standard YAML list syntax with `  - list entries`, one per line.
 - `/settings` now includes the same announcement lines that would print at launch.
 - Sanity checks the `--editor-model` on launch now, same as main and weak models.
 - Added `--skip-sanity-check-repo` switch to speedup launch in large repos.
@@ -880,7 +883,7 @@ versions.
 - Aider now offers to run shell commands:
   - Launch a browser to view updated html/css/js.
   - Install new dependencies.
-  - Run DB migrations. 
+  - Run DB migrations.
   - Run the program to exercise changes.
   - Run new test cases.
 - `/read` and `/drop` now expand `~` to the home dir.
@@ -934,7 +937,7 @@ versions.
 
 ### Aider v0.49.0
 
-- Add read-only files to the chat context with `/read` and `--read`,  including from outside the git repo.
+- Add read-only files to the chat context with `/read` and `--read`, including from outside the git repo.
 - `/diff` now shows diffs of all changes resulting from your request, including lint and test fixes.
 - New `/clipboard` command to paste images or text from the clipboard, replaces `/add-clipboard-image`.
 - Now shows the markdown scraped when you add a url with `/web`.
@@ -1120,7 +1123,6 @@ versions.
 - Use `--model-settings-file` to customize per-model settings, like use of repo-map (by @caseymcc).
 - Improved invocation of flake8 linter for python code.
 
-
 ### Aider v0.39.0
 
 - Use `--sonnet` for Claude 3.5 Sonnet, which is the top model on [aider's LLM code editing leaderboard](https://aider.chat/docs/leaderboards/#claude-35-sonnet-takes-the-top-spot).
@@ -1161,7 +1163,6 @@ versions.
   - Configure your testing command with `--test-cmd`.
   - Run tests with `/test` or from the command line with `--test`.
   - Aider will automatically attempt to fix any test failures.
-  
 
 ### Aider v0.35.0
 
@@ -1180,7 +1181,6 @@ versions.
 - Added explicit model settings for `openrouter/anthropic/claude-3-opus`, `gpt-3.5-turbo`
 - Added `--show-prompts` debug switch.
 - Bugfix: catch and retry on all litellm exceptions.
-
 
 ### Aider v0.33.0
 
@@ -1369,7 +1369,6 @@ versions.
 - Improved handling of malformed edit blocks targeting multiple edits to the same file. [Benchmarked](https://aider.chat/docs/benchmarks.html) at 65.4%, no regression.
 - Bugfix to properly handle malformed `/add` wildcards.
 
-
 ### Aider v0.15.0
 
 - Added support for `.aiderignore` file, which instructs aider to ignore parts of the git repo.
@@ -1397,7 +1396,6 @@ versions.
 - [Support for Claude2 and other LLMs via OpenRouter](https://aider.chat/docs/faq.html#accessing-other-llms-with-openrouter) by @joshuavial
 - Documentation for [running the aider benchmarking suite](https://github.com/Aider-AI/aider/tree/main/benchmark)
 - Aider now requires Python >= 3.9
-
 
 ### Aider v0.13.0
 
@@ -1446,7 +1444,6 @@ versions.
 - Provide GPT with detailed error if it makes a bad edit block, ask for a retry.
 - Force `--no-pretty` if aider detects it is running inside a VSCode terminal.
 - [Benchmarked](https://aider.chat/docs/benchmarks.html) at 64.7% for gpt-4/diff (no regression)
-
 
 ### Aider v0.9.0
 
@@ -1521,13 +1518,6 @@ versions.
 
 ### Aider v0.6.2
 
-* Support for `gpt-3.5-turbo-16k`, and all OpenAI chat models
-* Improved ability to correct when gpt-4 omits leading whitespace in code edits
-* Added `--openai-api-base` to support API proxies, etc.
-
-### Aider v0.5.0
-
-- Added support for `gpt-3.5-turbo` and `gpt-4-32k`.
-- Added `--map-tokens` to set a token budget for the repo map, along with a PageRank based algorithm for prioritizing which files and identifiers to include in the map.
-- Added in-chat command `/tokens` to report on context window token usage.
-- Added in-chat command `/clear` to clear the conversation history.
+- Support for `gpt-3.5-turbo-16k`, and all OpenAI chat models
+- Improved ability to correct when gpt-4 omits leading whitespace in code edits
+- Added `--openai-api-base` to support API proxies, etc.
