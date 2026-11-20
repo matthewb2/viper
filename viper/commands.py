@@ -1679,6 +1679,12 @@ Just show me the edits I need to make.
         except Exception as e:
             self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {str(e)}")
 
+    def cmd_time(self, args):
+        "Show the current time in KST (Asia/Seoul)"
+        from viper.time_tools import get_current_kst_time
+
+        self.io.tool_output(get_current_kst_time())
+
 
 def expand_subdir(file_path):
     if file_path.is_file():

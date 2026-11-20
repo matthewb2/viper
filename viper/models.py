@@ -982,7 +982,7 @@ class Model(ModelSettings):
 
             os.environ[openai_api_key] = token
 
-    def send_completion(self, messages, functions, stream, temperature=None):
+    def send_completion(self, messages, functions, stream, temperature=None, tools=None):
         if os.environ.get("AIDER_SANITY_CHECK_TURNS"):
             sanity_check_messages(messages)
 
@@ -1007,6 +1007,8 @@ class Model(ModelSettings):
             function = functions[0]
             kwargs["tools"] = [dict(type="function", function=function)]
             kwargs["tool_choice"] = {"type": "function", "function": {"name": function["name"]}}
+        elif tools:
+            kwargs["tools"] = tools
         if self.extra_params:
             kwargs.update(self.extra_params)
         if self.is_ollama() and "num_ctx" not in kwargs:

@@ -109,6 +109,7 @@ class Coder:
     test_outcome = None
     multi_response_content = ""
     partial_response_content = ""
+    partial_response_tool_calls = None
     commit_before_message = []
     message_cost = 0.0
     add_cache_headers = False
@@ -119,6 +120,42 @@ class Coder:
     ignore_mentions = None
     chat_language = None
     commit_language = None
+    max_tool_call_rounds = 8
+
+    def get_general_tools(self):
+        if self.functions:
+            return None
+        try:
+            from viper.time_tools import KST_TIME_TOOL_SCHEMA
+
+            return KST_TIME_TOOL_SCHEMA
+        except Exception:
+            return None
+
+    def get_general_tool_registry(self):
+        try:
+            from viper.time_tools import TOOL_REGISTRY
+
+            return TOOL_REGISTRY
+        except Exception:
+            return {}
+
+    def _normalize_tool_call(self, tool_call):
+        if tool_call is None:
+            return None
+        if isinstance(tool_call, dict):
+            tc_id = tool_call.get("id")
+            tc_type = tool_call.get("type", "function")
+            func = tool_call.get("function") or {}
+            name = func.get("name")
+            arguments = func.get("arguments") or ""
+            return {"id": tc_id, "type": tc_type, "function": {"name": name, "arguments": arguments}}
+        tc_id = getattr(tool_call, "id", None)
+        tc_type = getattr(tool_call, "type", "function")
+        func = getattr(tool_call, "function", None)
+        name = getattr(func, "name", None) if func else None
+        arguments = getattr(func, "arguments", None) if func else ""
+        return {"id": tc_id, "type": tc_type, "function": {"name": name, "arguments": arguments or ""}}
     file_watcher = None
 
     @classmethod
@@ -1416,6 +1453,71 @@ class Coder:
                 return False
         return True
 
+    def _try_handle_general_tool_calls(self, messages):
+        """Execute general (non-edit-function) tool calls and append results.
+        Returns True if tool calls were handled and another model round is needed.
+        """
+        if self.functions:
+            return False
+
+        tool_calls = self.partial_response_tool_calls
+        if not tool_calls:
+            return False
+
+        registry = self.get_general_tool_registry()
+        names = []
+        for tc in tool_calls:
+            func = (tc or {}).get("function") or {}
+            names.append(func.get("name"))
+
+        if not names or not all(name in registry for name in names):
+            return False
+
+        assistant_msg = {
+            "role": "assistant",
+            "content": self.partial_response_content or None,
+            "tool_calls": tool_calls,
+        }
+        self.cur_messages.append(assistant_msg)
+        messages.append(assistant_msg)
+
+        for tc in tool_calls:
+            func = tc.get("function") or {}
+            name = func.get("name")
+            raw_args = func.get("arguments") or ""
+            try:
+                args = json.loads(raw_args) if raw_args else {}
+            except Exception:
+                args = {"_raw": raw_args}
+
+            try:
+                handler = registry[name]
+                result = handler(args)
+            except Exception as err:
+                result = f"Error executing tool {name}: {err}"
+
+            if not isinstance(result, str):
+                try:
+                    result = json.dumps(result, ensure_ascii=False)
+                except Exception:
+                    result = str(result)
+
+            tool_msg = {
+                "role": "tool",
+                "tool_call_id": tc.get("id") or name,
+                "name": name,
+                "content": result,
+            }
+            self.cur_messages.append(tool_msg)
+            messages.append(tool_msg)
+
+        # Reset for next model response
+        self.partial_response_tool_calls = None
+        self.partial_response_function_call = dict()
+        self.partial_response_content = ""
+        self.multi_response_content = ""
+        return True
+
     def send_message(self, inp):
         self.event("message_send_starting")
 
@@ -1453,63 +1555,108 @@ class Coder:
         self.usage_report = None
         exhausted = False
         interrupted = False
+        tool_rounds = 0
+
         try:
             while True:
                 try:
-                    yield from self.send(messages, functions=self.functions)
-                    break
-                except litellm_ex.exceptions_tuple() as err:
-                    ex_info = litellm_ex.get_ex_info(err)
+                    while True:
+                        try:
+                            general_tools = None if self.functions else self.get_general_tools()
+                            yield from self.send(
+                                messages, functions=self.functions, tools=general_tools
+                            )
+                            break
+                        except litellm_ex.exceptions_tuple() as err:
+                            ex_info = litellm_ex.get_ex_info(err)
 
-                    if ex_info.name == "ContextWindowExceededError":
-                        exhausted = True
-                        break
+                            if ex_info.name == "ContextWindowExceededError":
+                                exhausted = True
+                                raise
 
-                    should_retry = ex_info.retry
-                    if should_retry:
-                        retry_delay *= 2
-                        if retry_delay > RETRY_TIMEOUT:
-                            should_retry = False
+                            should_retry = ex_info.retry
+                            if should_retry:
+                                retry_delay *= 2
+                                if retry_delay > RETRY_TIMEOUT:
+                                    should_retry = False
 
-                    if not should_retry:
+                            if not should_retry:
+                                self.mdstream = None
+                                self.check_and_open_urls(err, ex_info.description)
+                                raise
+
+                            err_msg = str(err)
+                            if ex_info.description:
+                                self.io.tool_warning(err_msg)
+                                self.io.tool_error(ex_info.description)
+                            else:
+                                self.io.tool_error(err_msg)
+
+                            self.io.tool_output(f"Retrying in {retry_delay:.1f} seconds...")
+                            time.sleep(retry_delay)
+                            continue
+                        except KeyboardInterrupt:
+                            interrupted = True
+                            raise
+                        except FinishReasonLength:
+                            # We hit the output limit!
+                            if not self.main_model.info.get("supports_assistant_prefill"):
+                                exhausted = True
+                                raise
+
+                            self.multi_response_content = self.get_multi_response_content_in_progress()
+
+                            if messages[-1]["role"] == "assistant":
+                                messages[-1]["content"] = self.multi_response_content
+                            else:
+                                messages.append(
+                                    dict(
+                                        role="assistant",
+                                        content=self.multi_response_content,
+                                        prefix=True,
+                                    )
+                                )
+                            # Continue inner loop to get the rest of the response
+                            continue
+                        except Exception as err:
+                            self.mdstream = None
+                            lines = traceback.format_exception(type(err), err, err.__traceback__)
+                            self.io.tool_warning("".join(lines))
+                            self.io.tool_error(str(err))
+                            self.event("message_send_exception", exception=str(err))
+                            return
+
+                    # Finalize this model response
+                    if self.mdstream:
+                        self.live_incremental_response(True)
                         self.mdstream = None
-                        self.check_and_open_urls(err, ex_info.description)
-                        break
+                        if self.stream and self.show_pretty():
+                            # prepare for possible next round display
+                            pass
+                    self._stop_waiting_spinner()
 
-                    err_msg = str(err)
-                    if ex_info.description:
-                        self.io.tool_warning(err_msg)
-                        self.io.tool_error(ex_info.description)
-                    else:
-                        self.io.tool_error(err_msg)
+                    self.partial_response_content = self.get_multi_response_content_in_progress(True)
+                    self.remove_reasoning_content()
 
-                    self.io.tool_output(f"Retrying in {retry_delay:.1f} seconds...")
-                    time.sleep(retry_delay)
-                    continue
-                except KeyboardInterrupt:
-                    interrupted = True
+                    if self._try_handle_general_tool_calls(messages):
+                        tool_rounds += 1
+                        self.multi_response_content = ""
+                        if tool_rounds >= self.max_tool_call_rounds:
+                            self.io.tool_warning("Reached maximum tool call rounds; stopping.")
+                        else:
+                            if self.show_pretty() and self.stream:
+                                self.mdstream = self.io.get_assistant_mdstream()
+                            # reset retry delay for fresh request? keep as-is
+                            continue
+                    # No (more) tool handling; proceed with final response
+                    self.multi_response_content = ""
                     break
-                except FinishReasonLength:
-                    # We hit the output limit!
-                    if not self.main_model.info.get("supports_assistant_prefill"):
-                        exhausted = True
-                        break
+                except litellm_ex.exceptions_tuple():
+                    # exhausted/non-retryable already flagged
+                    break
+                except KeyboardInterrupt:
+                    break
 
-                    self.multi_response_content = self.get_multi_response_content_in_progress()
-
-                    if messages[-1]["role"] == "assistant":
-                        messages[-1]["content"] = self.multi_response_content
-                    else:
-                        messages.append(
-                            dict(role="assistant", content=self.multi_response_content, prefix=True)
-                        )
-                except Exception as err:
-                    self.mdstream = None
-                    lines = traceback.format_exception(type(err), err, err.__traceback__)
-                    self.io.tool_warning("".join(lines))
-                    self.io.tool_error(str(err))
-                    self.event("message_send_exception", exception=str(err))
-                    return
         finally:
             if self.mdstream:
                 self.live_incremental_response(True)
@@ -1518,8 +1665,10 @@ class Coder:
             # Ensure any waiting spinner is stopped
             self._stop_waiting_spinner()
 
-            self.partial_response_content = self.get_multi_response_content_in_progress(True)
-            self.remove_reasoning_content()
+            # If we ended mid-tool-handling without adding, content is finalized above
+            if self.partial_response_content and not self.partial_response_tool_calls:
+                # already finalized
+                pass
             self.multi_response_content = ""
 
         ###
@@ -1531,7 +1680,12 @@ class Coder:
 
         self.show_usage_report()
 
-        self.add_assistant_reply_to_cur_messages()
+        # Add final assistant reply unless we ended right after tool results with no answer
+        if self.cur_messages and self.cur_messages[-1].get("role") == "tool":
+            if self.partial_response_content or self.partial_response_function_call:
+                self.add_assistant_reply_to_cur_messages()
+        elif not (self.partial_response_tool_calls and self.cur_messages and self.cur_messages[-1].get("role") == "assistant" and self.cur_messages[-1].get("tool_calls")):
+            self.add_assistant_reply_to_cur_messages()
 
         if exhausted:
             if self.cur_messages and self.cur_messages[-1]["role"] == "user":
@@ -1700,6 +1854,15 @@ class Coder:
         self.ok_to_warm_cache = False
 
     def add_assistant_reply_to_cur_messages(self):
+        if self.partial_response_tool_calls:
+            self.cur_messages += [
+                dict(
+                    role="assistant",
+                    content=self.partial_response_content or None,
+                    tool_calls=self.partial_response_tool_calls,
+                )
+            ]
+            return
         if self.partial_response_content:
             self.cur_messages += [dict(role="assistant", content=self.partial_response_content)]
         if self.partial_response_function_call:
@@ -1780,7 +1943,7 @@ class Coder:
         if added_fnames:
             return prompts.added_files.format(fnames=", ".join(added_fnames))
 
-    def send(self, messages, model=None, functions=None):
+    def send(self, messages, model=None, functions=None, tools=None):
         self.got_reasoning_content = False
         self.ended_reasoning_content = False
 
@@ -1789,6 +1952,7 @@ class Coder:
 
         self.partial_response_content = ""
         self.partial_response_function_call = dict()
+        self.partial_response_tool_calls = None
 
         self.io.log_llm_history("TO LLM", format_messages(messages))
 
@@ -1799,6 +1963,7 @@ class Coder:
                 functions,
                 self.stream,
                 self.temperature,
+                tools=tools,
             )
             self.chat_completion_call_hashes.append(hash_object.hexdigest())
 
@@ -1847,10 +2012,22 @@ class Coder:
         show_func_err = None
         show_content_err = None
         try:
-            if completion.choices[0].message.tool_calls:
-                self.partial_response_function_call = (
-                    completion.choices[0].message.tool_calls[0].function
-                )
+            tool_calls = getattr(completion.choices[0].message, "tool_calls", None)
+            if tool_calls:
+                self.partial_response_tool_calls = [
+                    self._normalize_tool_call(tc) for tc in tool_calls if tc is not None
+                ]
+                first = self.partial_response_tool_calls[0]
+                if first and first.get("function"):
+                    func = first["function"]
+                    self.partial_response_function_call = {
+                        "name": func.get("name"),
+                        "arguments": func.get("arguments") or "",
+                    }
+            else:
+                func_call = getattr(completion.choices[0].message, "function_call", None)
+                if func_call:
+                    self.partial_response_function_call = func_call
         except AttributeError as func_err:
             show_func_err = func_err
 
@@ -1899,6 +2076,7 @@ class Coder:
 
     def show_send_output_stream(self, completion):
         received_content = False
+        tool_call_accum = {}
 
         for chunk in completion:
             if len(chunk.choices) == 0:
@@ -1910,8 +2088,35 @@ class Coder:
             ):
                 raise FinishReasonLength()
 
+            delta = chunk.choices[0].delta
+
             try:
-                func = chunk.choices[0].delta.function_call
+                tool_calls = getattr(delta, "tool_calls", None)
+                if tool_calls:
+                    for tc in tool_calls:
+                        idx = getattr(tc, "index", 0) or 0
+                        if idx not in tool_call_accum:
+                            tool_call_accum[idx] = {
+                                "id": getattr(tc, "id", None),
+                                "type": getattr(tc, "type", None) or "function",
+                                "function": {"name": "", "arguments": ""},
+                            }
+                        if getattr(tc, "id", None):
+                            tool_call_accum[idx]["id"] = tc.id
+                        if getattr(tc, "type", None):
+                            tool_call_accum[idx]["type"] = tc.type
+                        func = getattr(tc, "function", None)
+                        if func:
+                            if getattr(func, "name", None):
+                                tool_call_accum[idx]["function"]["name"] += func.name
+                            if getattr(func, "arguments", None):
+                                tool_call_accum[idx]["function"]["arguments"] += func.arguments
+                    received_content = True
+            except Exception:
+                pass
+
+            try:
+                func = delta.function_call
                 # dump(func)
                 for k, v in func.items():
                     if k in self.partial_response_function_call:
@@ -1921,6 +2126,14 @@ class Coder:
                 received_content = True
             except AttributeError:
                 pass
+
+            if tool_call_accum:
+                self.partial_response_tool_calls = [tool_call_accum[i] for i in sorted(tool_call_accum)]
+                first = self.partial_response_tool_calls[0]
+                self.partial_response_function_call = {
+                    "name": first.get("function", {}).get("name"),
+                    "arguments": first.get("function", {}).get("arguments") or "",
+                }
 
             text = ""
 
