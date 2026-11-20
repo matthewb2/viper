@@ -1,4 +1,5 @@
 .env
+.github
 .DS_Store
 .vscode/
 aider.code-workspace
