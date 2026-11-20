@@ -708,10 +708,28 @@ class Coder:
 
     def get_cur_message_text(self):
         text = ""
-        for msg in self.cur_messages:
-            text += msg["content"] + "\n"
+        for i, msg in enumerate(getattr(self, "cur_messages", [])):
+            try:
+                if not isinstance(msg, dict):
+                    continue
+                content = msg.get("content")
+                if content is None:
+                    print(f"[DEBUG] cur_messages[{i}] content is None! msg={msg!r}")
+                    continue
+                if isinstance(content, list):
+                    for j, part in enumerate(content):
+                        part_text = part.get("text") if isinstance(part, dict) else part
+                        if part_text is None:
+                            print(f"[DEBUG] cur_messages[{i}][{j}] part_text is None! part={part!r}")
+                            continue
+                        text = text + str(part_text) + "\n"
+                else:
+                    text = text + str(content) + "\n"
+            except Exception as e:
+                print(f"[DEBUG] error at i={i}, msg={msg!r}: {type(e).__name__}: {e}")
+                raise
         return text
-
+        
     def get_ident_mentions(self, text):
         # Split the string on any character that is not alphanumeric
         # \W+ matches one or more non-word characters (equivalent to [^a-zA-Z0-9_]+)
@@ -1490,6 +1508,8 @@ class Coder:
             except Exception:
                 args = {"_raw": raw_args}
 
+            self.io.tool_output(f"Calling tool: {name}")
+
             try:
                 handler = registry[name]
                 result = handler(args)
@@ -1501,6 +1521,8 @@ class Coder:
                     result = json.dumps(result, ensure_ascii=False)
                 except Exception:
                     result = str(result)
+
+            self.io.tool_output(f"Tool {name} result: {result}")
 
             tool_msg = {
                 "role": "tool",
@@ -1530,6 +1552,19 @@ class Coder:
 
         chunks = self.format_messages()
         messages = chunks.all_messages()
+        if not self.functions and self.get_general_tools():
+            messages = list(messages) + [
+                {
+                    "role": "system",
+                    "content": (
+                        "Tool available: `get_current_kst_time` returns the exact current "
+                        "date/time in Korea Standard Time (KST, Asia/Seoul). "
+                        "When the user asks for the current KST time/date or needs an exact "
+                        "KST timestamp, you MUST call this tool and use its result. "
+                        "Do not guess or fabricate the time."
+                    ),
+                }
+            ]
         if not self.check_tokens(messages):
             return
         self.warm_cache(chunks)

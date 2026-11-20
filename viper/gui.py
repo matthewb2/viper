@@ -15,19 +15,22 @@ from viper.scrape import Scraper, has_playwright
 
 
 class CaptureIO(InputOutput):
-    lines = []
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lines = []
 
-    def tool_output(self, msg, log_only=False):
+    def tool_output(self, *messages, log_only=False, bold=False):
+        msg = " ".join(str(m) for m in messages) if messages else ""
         if not log_only:
             self.lines.append(msg)
-        super().tool_output(msg, log_only=log_only)
+        super().tool_output(*messages, log_only=log_only, bold=bold)
 
-    def tool_error(self, msg):
-        self.lines.append(msg)
-        super().tool_error(msg)
+    def tool_error(self, msg="", strip=True):
+        self.lines.append(str(msg))
+        super().tool_error(msg, strip=strip)
 
-    def tool_warning(self, msg):
-        self.lines.append(msg)
+    def tool_warning(self, msg=""):
+        self.lines.append(str(msg))
         super().tool_warning(msg)
 
     def get_captured_lines(self):
@@ -80,8 +83,9 @@ def get_coder():
         dry_run=coder.io.dry_run,
         encoding=coder.io.encoding,
     )
-    # coder.io = io # this breaks the input_history
+    coder.io = io
     coder.commands.io = io
+    coder.suggest_shell_commands = False
 
     for line in coder.get_announcements():
         coder.io.tool_output(line)
@@ -413,45 +417,75 @@ class GUI:
         prompt = self.state.prompt
         self.state.prompt = None
 
-        # This duplicates logic from within Coder
         self.num_reflections = 0
         self.max_reflections = 3
 
         while prompt:
             with self.messages.chat_message("assistant"):
-                res = st.write_stream(self.coder.run_stream(prompt))
-                self.state.messages.append({"role": "assistant", "content": res})
-                # self.cost()
+                try:
+                    st.caption(
+                        f"[debug] model={getattr(self.coder.main_model, 'name', '?')} "
+                        f"stream={self.coder.stream} pretty={self.coder.pretty} "
+                        f"yield_stream={getattr(self.coder, 'yield_stream', '?')} "
+                        f"edit_format={getattr(self.coder, 'edit_format', '?')}"
+                    )
+
+                    def debug_stream():
+                        chunk_count = 0
+                        char_count = 0
+                        try:
+                            for chunk in self.coder.run_stream(prompt):
+                                if chunk is None:
+                                    continue
+                                text = chunk if isinstance(chunk, str) else str(chunk)
+                                chunk_count += 1
+                                char_count += len(text)
+                                yield text
+                        finally:
+                            st.caption(
+                                f"[debug] stream finished: chunks={chunk_count}, chars={char_count}"
+                            )
+                            if chunk_count == 0:
+                                st.warning(
+                                    "[debug] run_stream()이(가) 표시 가능한 텍스트 청크를 반환하지 않았습니다. "
+                                    "모델 응답이 비어 있거나, 스트리밍/툴 호출 처리 후 최종 텍스트가 생성되지 않았을 수 있습니다."
+                                )
+
+                    res = st.write_stream(debug_stream())
+
+                    if not res:
+                        partial = getattr(self.coder, "partial_response_content", "") or ""
+                        if partial:
+                            st.info("[debug] 스트림 출력은 비었지만 partial_response_content가 있어 이를 표시합니다.")
+                            st.write(partial)
+                            res = partial
+                        else:
+                            st.error(
+                                "[debug] 최종 응답 텍스트가 비어 있습니다. "
+                                "모델 호출 실패, 무출력 응답, 또는 GUI 스트리밍 경로 문제를 확인하세요."
+                            )
+
+                        try:
+                            captured = self.coder.commands.io.get_captured_lines()
+                            if captured:
+                                with st.expander("Captured IO log", expanded=True):
+                                    st.code("\n".join(captured))
+                        except Exception as log_err:
+                            st.caption(f"[debug] captured log 읽기 실패: {log_err}")
+
+                    self.state.messages.append({"role": "assistant", "content": res or ""})
+                except Exception as e:
+                    st.exception(e)
+                    self.info(f"[debug] 오류 발생: {type(e).__name__}: {e}")
+                    try:
+                        captured = self.coder.commands.io.get_captured_lines()
+                        if captured:
+                            self.info("Captured IO log:\n" + "\n".join(captured), echo=True)
+                    except Exception:
+                        pass
+                    break
 
             prompt = None
-            if self.coder.reflected_message:
-                if self.num_reflections < self.max_reflections:
-                    self.num_reflections += 1
-                    self.info(self.coder.reflected_message)
-                    prompt = self.coder.reflected_message
-
-        with self.messages:
-            edit = dict(
-                role="edit",
-                fnames=self.coder.aider_edited_files,
-            )
-            if self.state.last_aider_commit_hash != self.coder.last_aider_commit_hash:
-                edit["commit_hash"] = self.coder.last_aider_commit_hash
-                edit["commit_message"] = self.coder.last_aider_commit_message
-                commits = f"{self.coder.last_aider_commit_hash}~1"
-                diff = self.coder.repo.diff_commits(
-                    self.coder.pretty,
-                    commits,
-                    self.coder.last_aider_commit_hash,
-                )
-                edit["diff"] = diff
-                self.state.last_aider_commit_hash = self.coder.last_aider_commit_hash
-
-            self.state.messages.append(edit)
-            self.show_edit_info(edit)
-
-        # re-render the UI for the non-prompt_pending state
-        st.rerun()
 
     def info(self, message, echo=True):
         info = dict(role="info", content=message)

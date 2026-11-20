@@ -1009,6 +1009,7 @@ class Model(ModelSettings):
             kwargs["tool_choice"] = {"type": "function", "function": {"name": function["name"]}}
         elif tools:
             kwargs["tools"] = tools
+            kwargs.setdefault("tool_choice", "auto")
         if self.extra_params:
             kwargs.update(self.extra_params)
         if self.is_ollama() and "num_ctx" not in kwargs:

@@ -1,1 +1,3 @@
 auto-commits: false
+yes-always: true
+subtree-only: true

@@ -12,13 +12,16 @@ def get_current_kst_time() -> str:
 TIME_TOOL_DECLARATION = {
     "name": "get_current_kst_time",
     "description": (
+        "Get the current date and time in Korea Standard Time (KST, Asia/Seoul). "
         "현재 한국 표준시(KST, Asia/Seoul) 날짜와 시각을 조회합니다. "
-        "최신 시각이나 타임스탬프가 필요할 때 호출하세요."
+        "Call this tool whenever the user asks for the current time/date in Korea or "
+        "needs an exact KST timestamp for edits. Do not guess the time."
     ),
     "parameters": {
         "type": "object",
         "properties": {},
         "required": [],
+        "additionalProperties": False,
     },
 }
 
@@ -39,4 +42,3 @@ def execute_time_tool(tool_name: str, arguments=None) -> str:
 TOOL_REGISTRY = {
     "get_current_kst_time": lambda args=None: get_current_kst_time(),
 }
-
