@@ -1,3 +1,7 @@
 auto-commits: false
 yes-always: true
-subtree-only: true
+subtree-only: false
+architect: true
+model: openrouter/openrouter/free
+editor-model: openrouter/openai/gpt-4o-mini
+editor-edit-format: diff

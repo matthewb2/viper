@@ -1,11 +1,14 @@
 .env
 .github
+.github/*
 .DS_Store
 .vscode/
 aider.code-workspace
 *.pyc
 .aider*
 .viper.tags.cache*
+.agents
+.git
 aider.bak/
 aider_chat.egg-info/
 build
