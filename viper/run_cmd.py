@@ -1,3 +1,5 @@
+import codecs
+import locale
 import os
 import platform
 import subprocess
@@ -6,6 +8,48 @@ from io import BytesIO
 
 import pexpect
 import psutil
+
+
+def _get_preferred_output_encoding() -> str:
+    """Return the most likely encoding for subprocess console output."""
+    if platform.system() == "Windows":
+        try:
+            import ctypes
+
+            cp = ctypes.windll.kernel32.GetConsoleOutputCP()
+            if cp:
+                return f"cp{cp}"
+        except Exception:
+            pass
+        try:
+            cp = ctypes.windll.kernel32.GetOEMCP()
+            if cp:
+                return f"cp{cp}"
+        except Exception:
+            pass
+    return locale.getpreferredencoding(False) or getattr(sys.stdout, "encoding", None) or "utf-8"
+
+
+def decode_cmd_output(raw_bytes: bytes, preferred_encoding: str | None = None) -> str:
+    if not raw_bytes:
+        return ""
+    encodings = []
+    for enc in (
+        "utf-8",
+        preferred_encoding,
+        locale.getpreferredencoding(False),
+        getattr(sys.stdout, "encoding", None),
+    ):
+        if enc and enc not in encodings:
+            encodings.append(enc)
+    if platform.system() == "Windows" and "cp949" not in encodings:
+        encodings.append("cp949")
+    for enc in encodings:
+        try:
+            return raw_bytes.decode(enc)
+        except Exception:
+            continue
+    return raw_bytes.decode("utf-8", errors="replace")
 
 
 def run_cmd(command, verbose=False, error_print=None, cwd=None):
@@ -39,6 +83,19 @@ def get_windows_parent_process_name():
         return None
 
 
+def _write_safe_stdout(text: str, stdout_enc: str):
+    if not text:
+        return
+    try:
+        sys.stdout.write(text)
+    except UnicodeEncodeError:
+        safe_text = text.encode(stdout_enc, errors="backslashreplace").decode(
+            stdout_enc, errors="replace"
+        )
+        sys.stdout.write(safe_text)
+    sys.stdout.flush()
+
+
 def run_cmd_subprocess(command, verbose=False, cwd=None, encoding=sys.stdout.encoding):
     if verbose:
         print("Using run_cmd_subprocess:", command)
@@ -63,25 +120,33 @@ def run_cmd_subprocess(command, verbose=False, cwd=None, encoding=sys.stdout.enc
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
+            text=False,
             shell=True,
-            encoding=encoding,
-            errors="replace",
-            bufsize=0,  # Set bufsize to 0 for unbuffered output
-            universal_newlines=True,
+            bufsize=0,
             cwd=cwd,
         )
 
-        output = []
+        raw_chunks = []
+        preferred_encoding = _get_preferred_output_encoding()
+        inc_decoder = codecs.getincrementaldecoder(preferred_encoding)(errors="replace")
+        stdout_enc = (
+            getattr(sys.stdout, "encoding", None) or encoding or preferred_encoding or "utf-8"
+        )
+
         while True:
-            chunk = process.stdout.read(1)
+            chunk = process.stdout.read(256)
             if not chunk:
                 break
-            print(chunk, end="", flush=True)  # Print the chunk in real-time
-            output.append(chunk)  # Store the chunk for later use
+            raw_chunks.append(chunk)
+            stream_text = inc_decoder.decode(chunk, final=False)
+            _write_safe_stdout(stream_text, stdout_enc)
+
+        tail_text = inc_decoder.decode(b"", final=True)
+        _write_safe_stdout(tail_text, stdout_enc)
 
         process.wait()
-        return process.returncode, "".join(output)
+        decoded_output = decode_cmd_output(b"".join(raw_chunks), preferred_encoding)
+        return process.returncode, decoded_output
     except Exception as e:
         return 1, str(e)
 
