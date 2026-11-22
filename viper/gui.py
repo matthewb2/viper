@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
+import json
 import os
 import random
-import sys
+from pathlib import Path
 
 import streamlit as st
 
@@ -12,6 +13,22 @@ from viper.dump import dump  # noqa: F401
 from viper.io import InputOutput
 from viper.main import main as cli_main
 from viper.scrape import Scraper, has_playwright
+
+I18N_DIR = Path(__file__).resolve().parent / "resources" / "i18n"
+SUPPORTED_LANGUAGES = {"ko": "language_ko", "en": "language_en"}
+DEFAULT_LANGUAGE = "ko"
+
+
+def load_translations(lang):
+    path = I18N_DIR / f"{lang}.json"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+TRANSLATIONS = {lang: load_translations(lang) for lang in SUPPORTED_LANGUAGES}
 
 
 class CaptureIO(InputOutput):
@@ -41,23 +58,22 @@ class CaptureIO(InputOutput):
 
 def search(text=None):
     results = []
-    for root, _, files in os.walk("aider"):
+    for root, _, files in os.walk("viper"):
         for file in files:
             path = os.path.join(root, file)
             if not text or text in path:
                 results.append(path)
-    # dump(results)
-
     return results
 
 
 # Keep state as a resource, which survives browser reloads (since Coder does too)
 class State:
-    keys = set()
+    def __init__(self):
+        self.keys = set()
 
     def init(self, key, val=None):
         if key in self.keys:
-            return
+            return False
 
         self.keys.add(key)
         setattr(self, key, val)
@@ -69,7 +85,7 @@ def get_state():
     return State()
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner="Viper 초기화 중...")
 def get_coder():
     coder = cli_main(return_coder=True)
     if not isinstance(coder, Coder):
@@ -100,6 +116,23 @@ class GUI:
     recent_msgs_empty = None
     web_content_empty = None
 
+    @property
+    def lang(self):
+        lang = st.session_state.get("language", DEFAULT_LANGUAGE)
+        return lang if lang in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
+
+    def t(self, key, **kwargs):
+        lang = self.lang
+        text = TRANSLATIONS.get(lang, {}).get(key)
+        if text is None:
+            text = TRANSLATIONS.get("en", {}).get(key, key)
+        if kwargs:
+            try:
+                return text.format(**kwargs)
+            except Exception:
+                return text
+        return text
+
     def announce(self):
         lines = self.coder.get_announcements()
         lines = "  \n".join(lines)
@@ -119,14 +152,14 @@ class GUI:
         show_undo = False
         res = ""
         if commit_hash:
-            res += f"Commit `{commit_hash}`: {commit_message}  \n"
+            res += self.t("commit_info", commit_hash=commit_hash, commit_message=commit_message)
             if commit_hash == self.coder.last_aider_commit_hash:
                 show_undo = True
 
         if fnames:
             fnames = [f"`{fname}`" for fname in fnames]
             fnames = ", ".join(fnames)
-            res += f"Applied edits to {fnames}."
+            res += self.t("applied_edits_to", fnames=fnames)
 
         if diff:
             with st.expander(res):
@@ -147,31 +180,38 @@ class GUI:
         undone = self.state.last_undone_commit_hash == commit_hash
         if not undone:
             with self.last_undo_empty:
-                if self.button(f"Undo commit `{commit_hash}`", key=f"undo_{commit_hash}"):
+                if self.button(
+                    self.t("undo_commit", commit_hash=commit_hash), key=f"undo_{commit_hash}"
+                ):
                     self.do_undo(commit_hash)
+
+    def do_language_menu(self):
+        lang_codes = list(SUPPORTED_LANGUAGES.keys())
+        current_lang = self.lang
+        current_index = lang_codes.index(current_lang) if current_lang in lang_codes else 0
+        st.selectbox(
+            self.t("language_label"),
+            options=lang_codes,
+            index=current_index,
+            format_func=lambda code: self.t(f"language_{code}"),
+            key="language",
+        )
 
     def do_sidebar(self):
         with st.sidebar:
-            st.title("Aider")
-            # self.cmds_tab, self.settings_tab = st.tabs(["Commands", "Settings"])
-
-            # self.do_recommended_actions()
+            st.title(self.t("app_title"))
             self.do_add_to_chat()
             self.do_recent_msgs()
             self.do_clear_chat_history()
-            # st.container(height=150, border=False)
-            # st.write("### Experimental")
 
-            st.warning(
-                "This browser version of aider is experimental. Please share feedback in [GitHub"
-                " issues](https://github.com/Aider-AI/aider/issues)."
-            )
+            st.warning(self.t("experimental_warning"))
+            self.do_language_menu()
 
     def do_settings_tab(self):
         pass
 
     def do_recommended_actions(self):
-        text = "Aider works best when your code is stored in a git repo.  \n"
+        text = "Viper works best when your code is stored in a git repo.  \n"
         text += f"[See the FAQ for more info]({urls.git})"
 
         with st.expander("Recommended actions", expanded=True):
@@ -184,58 +224,50 @@ class GUI:
                 self.button("Add `.aider*` to `.gitignore`", key=random.random(), help="?")
 
     def do_add_to_chat(self):
-        # with st.expander("Add to the chat", expanded=True):
         self.do_add_files()
         self.do_add_web_page()
 
     def do_add_files(self):
         fnames = st.multiselect(
-            "Add files to the chat",
+            self.t("add_files_to_chat"),
             self.coder.get_all_relative_files(),
             default=self.state.initial_inchat_files,
-            placeholder="Files to edit",
+            placeholder=self.t("files_to_edit_placeholder"),
             disabled=self.prompt_pending(),
-            help=(
-                "Only add the files that need to be *edited* for the task you are working"
-                " on. Aider will pull in other relevant code to provide context to the LLM."
-            ),
+            help=self.t("files_to_edit_help"),
         )
 
         for fname in fnames:
             if fname not in self.coder.get_inchat_relative_files():
                 self.coder.add_rel_fname(fname)
-                self.info(f"Added {fname} to the chat")
+                self.info(self.t("added_file_to_chat", fname=fname))
 
         for fname in self.coder.get_inchat_relative_files():
             if fname not in fnames:
                 self.coder.drop_rel_fname(fname)
-                self.info(f"Removed {fname} from the chat")
+                self.info(self.t("removed_file_from_chat", fname=fname))
 
     def do_add_web_page(self):
-        with st.popover("Add a web page to the chat"):
+        with st.popover(self.t("add_web_page_to_chat")):
             self.do_web()
 
     def do_add_image(self):
-        with st.popover("Add image"):
-            st.markdown("Hello World 👋")
-            st.file_uploader("Image file", disabled=self.prompt_pending())
+        with st.popover(self.t("add_image")):
+            st.file_uploader(self.t("image_file"), disabled=self.prompt_pending())
 
     def do_run_shell(self):
-        with st.popover("Run shell commands, tests, etc"):
-            st.markdown(
-                "Run a shell command and optionally share the output with the LLM. This is"
-                " a great way to run your program or run tests and have the LLM fix bugs."
-            )
-            st.text_input("Command:")
+        with st.popover(self.t("run_shell_commands")):
+            st.markdown(self.t("run_shell_commands_desc"))
+            st.text_input(self.t("command_label"))
             st.radio(
-                "Share the command output with the LLM?",
+                self.t("share_command_output"),
                 [
-                    "Review the output and decide whether to share",
-                    "Automatically share the output on non-zero exit code (ie, if any tests fail)",
+                    self.t("share_output_review"),
+                    self.t("share_output_auto_fail"),
                 ],
             )
             st.selectbox(
-                "Recent commands",
+                self.t("recent_commands"),
                 [
                     "my_app.py --doit",
                     "my_app.py --cleanup",
@@ -244,19 +276,19 @@ class GUI:
             )
 
     def do_tokens_and_cost(self):
-        with st.expander("Tokens and costs", expanded=True):
+        with st.expander(self.t("tokens_and_costs"), expanded=True):
             pass
 
     def do_show_token_usage(self):
-        with st.popover("Show token usage"):
+        with st.popover(self.t("show_token_usage")):
             st.write("hi")
 
     def do_clear_chat_history(self):
-        text = "Saves tokens, reduces confusion"
-        if self.button("Clear chat history", help=text):
+        text = self.t("clear_chat_history_help")
+        if self.button(self.t("clear_chat_history"), help=text):
             self.coder.done_messages = []
             self.coder.cur_messages = []
-            self.info("Cleared chat history. Now the LLM can't see anything before this line.")
+            self.info(self.t("cleared_chat_history"))
 
     def do_show_metrics(self):
         st.metric("Cost of last message send & reply", "$0.0019", help="foo")
@@ -264,16 +296,14 @@ class GUI:
         st.metric("Total cost this session", "$0.22")
 
     def do_git(self):
-        with st.expander("Git", expanded=False):
-            # st.button("Show last diff")
-            # st.button("Undo last commit")
-            self.button("Commit any pending changes")
-            with st.popover("Run git command"):
-                st.markdown("## Run git command")
+        with st.expander(self.t("git"), expanded=False):
+            self.button(self.t("commit_pending_changes"))
+            with st.popover(self.t("run_git_command")):
+                st.markdown(f"## {self.t('run_git_command')}")
                 st.text_input("git", value="git ")
-                self.button("Run")
+                self.button(self.t("run"))
                 st.selectbox(
-                    "Recent git commands",
+                    self.t("recent_git_commands"),
                     [
                         "git checkout -b experiment",
                         "git stash",
@@ -291,10 +321,9 @@ class GUI:
 
         with self.recent_msgs_empty:
             self.old_prompt = st.selectbox(
-                "Resend a recent chat message",
+                self.t("recent_chat_message"),
                 self.state.input_history,
-                placeholder="Choose a recent chat message",
-                # label_visibility="collapsed",
+                placeholder=self.t("recent_chat_message_placeholder"),
                 index=None,
                 key=f"recent_msgs_{self.state.recent_msgs_num}",
                 disabled=self.prompt_pending(),
@@ -304,10 +333,6 @@ class GUI:
 
     def do_messages_container(self):
         self.messages = st.container()
-
-        # stuff a bunch of vertical whitespace at the top
-        # to get all the chat text to the bottom
-        # self.messages.container(height=300, border=False)
 
         with self.messages:
             for msg in self.state.messages:
@@ -325,14 +350,13 @@ class GUI:
                 elif role in ("user", "assistant"):
                     with st.chat_message(role):
                         st.write(msg["content"])
-                        # self.cost()
                 else:
                     st.dict(msg)
 
     def initialize_state(self):
         messages = [
             dict(role="info", content=self.announce()),
-            dict(role="assistant", content="How can I help you?"),
+            dict(role="assistant", content=self.t("assistant_greeting")),
         ]
 
         self.state.init("messages", messages)
@@ -354,8 +378,6 @@ class GUI:
 
     def button(self, args, **kwargs):
         "Create a button, disabled if prompt pending"
-
-        # Force everything to be disabled if there is a prompt pending
         if self.prompt_pending():
             kwargs["disabled"] = True
 
@@ -365,7 +387,6 @@ class GUI:
         self.coder = get_coder()
         self.state = get_state()
 
-        # Force the coder to cooperate, regardless of cmd line args
         self.coder.yield_stream = True
         self.coder.stream = True
         self.coder.pretty = False
@@ -375,17 +396,23 @@ class GUI:
         self.do_messages_container()
         self.do_sidebar()
 
-        user_inp = st.chat_input("Say something")
+        user_inp = st.chat_input(self.t("chat_placeholder"))
         if user_inp:
             self.prompt = user_inp
 
         if self.prompt_pending():
-            self.process_chat()
+            if st.session_state.get("_viper_processing_prompt"):
+                self.process_chat()
+            else:
+                self.state.prompt = None
+                st.session_state.pop("_viper_processing_prompt", None)
 
         if not self.prompt:
+            st.session_state.pop("_viper_processing_prompt", None)
             return
 
         self.state.prompt = self.prompt
+        st.session_state["_viper_processing_prompt"] = True
 
         if self.prompt_as == "user":
             self.coder.io.add_to_input_history(self.prompt)
@@ -399,11 +426,10 @@ class GUI:
                 st.write(self.prompt)
         elif self.prompt_as == "text":
             line = self.prompt.splitlines()[0]
-            line += "??"
+            line += "..."
             with self.messages.expander(line):
                 st.text(self.prompt)
 
-        # re-render the UI for the prompt_pending state
         st.rerun()
 
     def prompt_pending(self):
@@ -424,63 +450,68 @@ class GUI:
             with self.messages.chat_message("assistant"):
                 try:
                     st.caption(
-                        f"[debug] model={getattr(self.coder.main_model, 'name', '?')} "
-                        f"stream={self.coder.stream} pretty={self.coder.pretty} "
-                        f"yield_stream={getattr(self.coder, 'yield_stream', '?')} "
-                        f"edit_format={getattr(self.coder, 'edit_format', '?')}"
+                        self.t(
+                            "debug_model_info",
+                            model=getattr(self.coder.main_model, "name", "?"),
+                            stream=self.coder.stream,
+                            pretty=self.coder.pretty,
+                            yield_stream=getattr(self.coder, "yield_stream", "?"),
+                            edit_format=getattr(self.coder, "edit_format", "?"),
+                        )
                     )
 
+                    stream_stats = {"chunks": 0, "chars": 0}
+
                     def debug_stream():
-                        chunk_count = 0
-                        char_count = 0
                         try:
                             for chunk in self.coder.run_stream(prompt):
                                 if chunk is None:
                                     continue
-                                text = chunk if isinstance(chunk, str) else str(chunk)
-                                chunk_count += 1
-                                char_count += len(text)
-                                yield text
-                        finally:
-                            st.caption(
-                                f"[debug] stream finished: chunks={chunk_count}, chars={char_count}"
-                            )
-                            if chunk_count == 0:
-                                st.warning(
-                                    "[debug] run_stream()이(가) 표시 가능한 텍스트 청크를 반환하지 않았습니다. "
-                                    "모델 응답이 비어 있거나, 스트리밍/툴 호출 처리 후 최종 텍스트가 생성되지 않았을 수 있습니다."
-                                )
+                                text_chunk = chunk if isinstance(chunk, str) else str(chunk)
+                                stream_stats["chunks"] += 1
+                                stream_stats["chars"] += len(text_chunk)
+                                yield text_chunk
+                        except Exception as stream_err:
+                            st.exception(stream_err)
+                            raise
 
                     res = st.write_stream(debug_stream())
+
+                    st.caption(
+                        self.t(
+                            "debug_stream_finished",
+                            chunks=stream_stats["chunks"],
+                            chars=stream_stats["chars"],
+                        )
+                    )
+                    if stream_stats["chunks"] == 0:
+                        st.warning(self.t("debug_no_chunks"))
 
                     if not res:
                         partial = getattr(self.coder, "partial_response_content", "") or ""
                         if partial:
-                            st.info("[debug] 스트림 출력은 비었지만 partial_response_content가 있어 이를 표시합니다.")
+                            st.info(self.t("debug_partial_response"))
                             st.write(partial)
                             res = partial
                         else:
-                            st.error(
-                                "[debug] 최종 응답 텍스트가 비어 있습니다. "
-                                "모델 호출 실패, 무출력 응답, 또는 GUI 스트리밍 경로 문제를 확인하세요."
-                            )
+                            st.error(self.t("debug_empty_response"))
 
                         try:
                             captured = self.coder.commands.io.get_captured_lines()
                             if captured:
-                                with st.expander("Captured IO log", expanded=True):
+                                with st.expander(self.t("debug_captured_log"), expanded=True):
                                     st.code("\n".join(captured))
                         except Exception as log_err:
-                            st.caption(f"[debug] captured log 읽기 실패: {log_err}")
+                            st.caption(self.t("debug_captured_log_read_failed", error=log_err))
 
                     self.state.messages.append({"role": "assistant", "content": res or ""})
                 except Exception as e:
                     st.exception(e)
-                    self.info(f"[debug] 오류 발생: {type(e).__name__}: {e}")
+                    self.info(self.t("debug_error", error=f"{type(e).__name__}: {e}"))
                     try:
                         captured = self.coder.commands.io.get_captured_lines()
                         if captured:
-                            self.info("Captured IO log:\n" + "\n".join(captured), echo=True)
+                            self.info(self.t("debug_captured_log_label", log="\n".join(captured)), echo=True)
                     except Exception:
                         pass
                     break
@@ -491,12 +522,11 @@ class GUI:
         info = dict(role="info", content=message)
         self.state.messages.append(info)
 
-        # We will render the tail of the messages array after this call
         if echo:
             self.messages.info(message)
 
     def do_web(self):
-        st.markdown("Add the text content of a web page to the chat")
+        st.markdown(self.t("add_web_page_desc"))
 
         if not self.web_content_empty:
             self.web_content_empty = st.empty()
@@ -508,7 +538,7 @@ class GUI:
         with self.web_content_empty:
             self.web_content = st.text_input(
                 "URL",
-                placeholder="https://...",
+                placeholder=self.t("url_placeholder"),
                 key=f"web_content_{self.state.web_content_num}",
             )
 
@@ -518,15 +548,15 @@ class GUI:
         url = self.web_content
 
         if not self.state.scraper:
-            self.scraper = Scraper(print_error=self.info, playwright_available=has_playwright())
+            self.state.scraper = Scraper(print_error=self.info, playwright_available=has_playwright())
 
-        content = self.scraper.scrape(url) or ""
+        content = self.state.scraper.scrape(url) or ""
         if content.strip():
             content = f"{url}\n\n" + content
             self.prompt = content
             self.prompt_as = "text"
         else:
-            self.info(f"No web content found for `{url}`.")
+            self.info(self.t("no_web_content", url=url))
             self.web_content = None
 
     def do_undo(self, commit_hash):
@@ -558,22 +588,33 @@ class GUI:
 def gui_main():
     st.set_page_config(
         layout="wide",
-        page_title="Aider",
+        page_title="Viper",
         page_icon=urls.favicon,
         menu_items={
             "Get Help": urls.website,
-            "Report a bug": "https://github.com/Aider-AI/aider/issues",
-            "About": "# Aider\nAI pair programming in your browser.",
+            "Report a bug": "https://github.com/matthewb2/viper/issues",
+            "About": "# Viper\n브라우저에서 AI 페어 프로그래밍.",
         },
     )
 
-    # config_options = st.config._config_options
-    # for key, value in config_options.items():
-    #    print(f"{key}: {value.value}")
+    st.markdown(
+        """
+        <style>
+        header [data-testid="stHeaderActionElements"] { display: none !important; }
+        [data-testid="stMainBlockContainer"] {
+            margin-top: -50px !important;
+        }
+        
+        [data-testid="stSidebarUserContent"] {
+            margin-top: -50px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     GUI()
 
 
 if __name__ == "__main__":
-    status = gui_main()
-    sys.exit(status)
+    gui_main()
